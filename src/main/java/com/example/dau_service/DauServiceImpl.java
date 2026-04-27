@@ -33,7 +33,9 @@ public class DauServiceImpl  implements  DauService{
     @Override
     public void postEvent(Event event) {
         LocalDate eventDate = event.timestamp() != null
-                ? event.timestamp().atZone(ZoneId.systemDefault()).toLocalDate()
+                ? event.timestamp()
+                .atZone(ZoneId.systemDefault())  /* переводим в пояс сервера */
+                .toLocalDate()                   /* берём только дату */
                 : LocalDate.now();
 
         updateDate();

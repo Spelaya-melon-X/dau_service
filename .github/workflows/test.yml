@@ -1,0 +1,42 @@
+name: Run Tests 🧪
+
+# Когда запускать воркфлоу
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+# Что делать
+jobs:
+  test:
+    runs-on: ubuntu-latest  # Виртуальная машина с Linux
+
+    steps:
+      # 1. Скачать твой код
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Установить Java (укажи свою версию: 17, 21 и т.д.)
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'  # Или 'corretto', 'zulu'
+          cache: gradle            # Кэширование зависимостей для ускорения
+
+      # 3. Дать права на запуск градла (только для Linux)
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # 4. Запустить тесты
+      - name: Run tests with Gradle
+        run: ./gradlew clean test
+
+      # 5. (Опционально) Загрузить отчет о тестах как артефакт
+      - name: Upload test report
+        if: always()  # Загрузить даже если тесты упали
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: build/reports/tests/test/
