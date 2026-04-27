@@ -13,11 +13,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Официальный экшн от Gradle: сам скачает Gradle, настроит кэш и Java
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: '8.5' # Можешь указать версию из своего gradle-wrapper.properties
+          cache: true
 
       - name: Run tests
         run: gradle clean test
