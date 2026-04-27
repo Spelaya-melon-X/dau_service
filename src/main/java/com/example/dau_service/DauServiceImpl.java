@@ -1,8 +1,9 @@
 package com.example.dau_service;
 
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
+import java.time.ZoneId;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class DauServiceImpl  implements  DauService{
     LocalDate lastUpdateDate;
@@ -10,37 +11,55 @@ public class DauServiceImpl  implements  DauService{
 
 
     public DauServiceImpl() {
-        this.visitorStatisticMap = new HashMap<>();
-        LocalDate createDate = LocalDate.now();
-        lastUpdateDate = createDate;
-        visitorStatisticMap.put(createDate , new VisitorStatistic()) ;
+        this.visitorStatisticMap = new ConcurrentHashMap<>();
+        LocalDate today = LocalDate.now();
+        lastUpdateDate = today;
+        visitorStatisticMap.put(today , new VisitorStatistic()) ;
+        visitorStatisticMap.put(today.minusDays(1) , new VisitorStatistic()) ;
+
     }
 
     private void updateDate() {
         synchronized (visitorStatisticMap) {
             LocalDate dateNow = LocalDate.now();
-            long daysBetween = Math.abs(ChronoUnit.DAYS.between(dateNow, lastUpdateDate));
-            if (daysBetween >= 1 ) {
+            if (!dateNow.isEqual(lastUpdateDate)) {
                 visitorStatisticMap.put(dateNow, new VisitorStatistic());
                 lastUpdateDate = dateNow;
             }
+            visitorStatisticMap.keySet().removeIf(d -> d.isBefore(LocalDate.now().minusDays(3)));
         }
     }
 
     @Override
     public void postEvent(Event event) {
+        LocalDate eventDate = event.timestamp() != null
+                ? event.timestamp().atZone(ZoneId.systemDefault()).toLocalDate()
+                : LocalDate.now();
+
         updateDate();
+
         synchronized (visitorStatisticMap) {
-            visitorStatisticMap.get(lastUpdateDate).updateStatistic(event);
+            visitorStatisticMap.computeIfAbsent(eventDate, k -> new VisitorStatistic());
+            visitorStatisticMap.get(eventDate).updateStatistic(event);
         }
     }
 
     @Override
     public Map<Integer, Long> getDauStatistics(List<Integer> authorIds) {
         Map<Integer, Long> result = new HashMap<>();
-        updateDate();
+
+        LocalDate yesterday = LocalDate.now().minusDays(1);
+
         synchronized (visitorStatisticMap) {
-            VisitorStatistic visitorStatistic = visitorStatisticMap.get(lastUpdateDate);
+
+            VisitorStatistic visitorStatistic = visitorStatisticMap.get(yesterday);
+            if (visitorStatistic == null) {
+                for (var authorId : authorIds) {
+                    result.put(authorId , 0L);
+                }
+                return result;
+            }
+
             for ( var authorId : authorIds) {
                 if ( visitorStatistic.uniqueVisitors.containsKey(authorId)) {
                     result.put( authorId , visitorStatistic.uniqueVisitors.get(authorId).getCountUser() ) ;
@@ -54,9 +73,14 @@ public class DauServiceImpl  implements  DauService{
 
     @Override
     public Long getAuthorDauStatistics(int authorId) {
-        updateDate();
+        LocalDate yesterday = LocalDate.now().minusDays(1);
+
         synchronized (visitorStatisticMap) {
-            VisitorStatistic visitorStatistic = visitorStatisticMap.get(lastUpdateDate);
+            VisitorStatistic visitorStatistic = visitorStatisticMap.get(yesterday);
+            if (visitorStatistic == null) {
+                return 0L;
+            }
+
             if (visitorStatistic.uniqueVisitors.containsKey(authorId)) {
                 return visitorStatistic.uniqueVisitors.get(authorId).getCountUser();
             }else {

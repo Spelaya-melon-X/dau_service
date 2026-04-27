@@ -1,16 +1,18 @@
 package com.example.dau_service;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
 public class SetUsers {
-    private Set<Integer> users;
+    final private Set<Integer> users;
 
     public SetUsers() {
-        this.users = new HashSet<>();
+        this.users = Collections.synchronizedSet(new HashSet<>());
     }
+
     public SetUsers(Integer firstUser) {
-        users = new HashSet<>();
+        users = Collections.synchronizedSet(new HashSet<>());
         users.add(firstUser);
     }
 
