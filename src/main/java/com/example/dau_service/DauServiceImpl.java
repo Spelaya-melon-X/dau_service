@@ -4,30 +4,30 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class DauServiceImpl  implements  DauService{
-    LocalDate lastUpdateDate;
-    Map<LocalDate , VisitorStatistic> visitorStatisticMap;
+    final AtomicReference<LocalDate> lastUpdateDate;
+    final Map<LocalDate , VisitorStatistic> visitorStatisticMap;
 
 
     public DauServiceImpl() {
         this.visitorStatisticMap = new ConcurrentHashMap<>();
-        LocalDate today = LocalDate.now();
+        AtomicReference<LocalDate> today = new AtomicReference<>(LocalDate.now());
         lastUpdateDate = today;
-        visitorStatisticMap.put(today , new VisitorStatistic()) ;
-        visitorStatisticMap.put(today.minusDays(1) , new VisitorStatistic()) ;
+        visitorStatisticMap.put(today.get() , new VisitorStatistic()) ;
+        visitorStatisticMap.put(today.get().minusDays(1) , new VisitorStatistic()) ;
 
     }
 
     private void updateDate() {
-        synchronized (visitorStatisticMap) {
-            LocalDate dateNow = LocalDate.now();
-            if (!dateNow.isEqual(lastUpdateDate)) {
-                visitorStatisticMap.put(dateNow, new VisitorStatistic());
-                lastUpdateDate = dateNow;
-            }
-            visitorStatisticMap.keySet().removeIf(d -> d.isBefore(LocalDate.now().minusDays(3)));
+        LocalDate dateNow = LocalDate.now();
+        LocalDate currentLastDate = lastUpdateDate.get();
+        boolean wasUpdated = lastUpdateDate.compareAndSet(currentLastDate , dateNow );
+        if (wasUpdated) {
+            visitorStatisticMap.put(dateNow, new VisitorStatistic());
         }
+        visitorStatisticMap.keySet().removeIf(d -> d.isBefore(LocalDate.now().minusDays(3)));
     }
 
     @Override
@@ -40,10 +40,9 @@ public class DauServiceImpl  implements  DauService{
 
         updateDate();
 
-        synchronized (visitorStatisticMap) {
-            visitorStatisticMap.computeIfAbsent(eventDate, k -> new VisitorStatistic());
-            visitorStatisticMap.get(eventDate).updateStatistic(event);
-        }
+        visitorStatisticMap.computeIfAbsent(eventDate, k -> new VisitorStatistic());
+        visitorStatisticMap.get(eventDate).updateStatistic(event);
+
     }
 
     @Override
@@ -52,24 +51,23 @@ public class DauServiceImpl  implements  DauService{
 
         LocalDate yesterday = LocalDate.now().minusDays(1);
 
-        synchronized (visitorStatisticMap) {
 
-            VisitorStatistic visitorStatistic = visitorStatisticMap.get(yesterday);
-            if (visitorStatistic == null) {
-                for (var authorId : authorIds) {
-                    result.put(authorId , 0L);
-                }
-                return result;
+        VisitorStatistic visitorStatistic = visitorStatisticMap.get(yesterday);
+        if (visitorStatistic == null) {
+            for (var authorId : authorIds) {
+                result.put(authorId , 0L);
             }
+            return result;
+        }
 
-            for ( var authorId : authorIds) {
-                if ( visitorStatistic.uniqueVisitors.containsKey(authorId)) {
-                    result.put( authorId , visitorStatistic.uniqueVisitors.get(authorId).getCountUser() ) ;
-                }else {
-                    result.put(authorId , 0L);
-                }
+        for ( var authorId : authorIds) {
+            if ( visitorStatistic.uniqueVisitors.containsKey(authorId)) {
+                result.put( authorId , visitorStatistic.uniqueVisitors.get(authorId).getCountUser() ) ;
+            }else {
+                result.put(authorId , 0L);
             }
         }
+
         return result;
     }
 
@@ -77,17 +75,15 @@ public class DauServiceImpl  implements  DauService{
     public Long getAuthorDauStatistics(int authorId) {
         LocalDate yesterday = LocalDate.now().minusDays(1);
 
-        synchronized (visitorStatisticMap) {
-            VisitorStatistic visitorStatistic = visitorStatisticMap.get(yesterday);
-            if (visitorStatistic == null) {
-                return 0L;
-            }
+        VisitorStatistic visitorStatistic = visitorStatisticMap.get(yesterday);
+        if (visitorStatistic == null) {
+            return 0L;
+        }
 
-            if (visitorStatistic.uniqueVisitors.containsKey(authorId)) {
-                return visitorStatistic.uniqueVisitors.get(authorId).getCountUser();
-            }else {
-                return 0L;
-            }
+        if (visitorStatistic.uniqueVisitors.containsKey(authorId)) {
+            return visitorStatistic.uniqueVisitors.get(authorId).getCountUser();
+        }else {
+            return 0L;
         }
 
     }

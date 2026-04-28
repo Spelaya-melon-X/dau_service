@@ -17,12 +17,12 @@ public class VisitorStatistic {
     void updateStatistic(Event event) {
         Integer userId = event.userId();
         Integer authorId = event.authorId();
-        synchronized (uniqueVisitors) {
-            if (!uniqueVisitors.containsKey(authorId)) {
-                uniqueVisitors.put(authorId, new SetUsers());
-            }
-            uniqueVisitors.get(authorId).addNewUser(userId);
-        }
+// было
+//        if (!uniqueVisitors.containsKey(authorId)) {
+//            uniqueVisitors.put(authorId, new SetUsers());
+//        }
+//стало
+        uniqueVisitors.computeIfAbsent(authorId , k-> new SetUsers()).addNewUser(userId)  ;
     }
 
 }
